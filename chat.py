@@ -19,7 +19,7 @@ FUNCTIONS = [
         "type": "function",
         "function": {
             "name": "query_db",
-            "description": "Execute a read-only SQL query against the database and return the result as a string. Only SELECT queries are allowed.",
+            "description": "Execute a read-only SQL query against the database and return the result as a string. Supports SELECT queries and CTEs (Common Table Expressions). The database is opened in read-only mode to prevent write operations.",
             "parameters": {
                 "type": "object",
                 "properties": {
