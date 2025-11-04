@@ -46,7 +46,7 @@ This will create `synthea_data.db` from the CSV files in the `csvs/` directory.
 
 ### Basic Usage
 
-Run the chat interface with the default model (gpt-4o):
+Run the chat interface with the default model (gpt-5):
 ```bash
 python chat.py
 ```

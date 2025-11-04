@@ -1,19 +1,8 @@
-import os
 import json
-import argparse
-from typing import List, Dict, Any
-from openai import OpenAI
-from dotenv import load_dotenv
-
+from typing import Dict, Any
 from tools.sqlite import query_db, get_db_schema, get_patient_data, compare_dates
 
-# Load environment variables
-load_dotenv()
-
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Function definitions for OpenAI
+# Function definitions for WebLLM (same format as OpenAI)
 FUNCTIONS = [
     {
         "type": "function",
@@ -165,95 +154,16 @@ def execute_function(function_name: str, arguments: Dict[str, Any]) -> Any:
         return f"Error executing {function_name}: {str(e)}"
 
 
-def chat_loop(model: str = "gpt-5"):
-    """Main chat loop with function calling support."""
-    messages: List[Dict[str, Any]] = [
-        {
-            "role": "system",
-            "content": "You are a helpful healthcare assistant that can query patient data and medical records from a SQLite database. You can help users understand patient information, analyze medical data, and answer questions about healthcare records. Do not make assumptions about what terms can be used to query the database; rely on the tools provided to you.",
-        }
-    ]
+# Export functions for JavaScript to use
+def get_functions():
+    """Return the function definitions for WebLLM API."""
+    return FUNCTIONS
 
-    print("Healthcare Agent Chat")
-    print(f"Using model: {model}")
-    print("Type 'exit' or 'quit' to end the conversation.\n")
-
-    while True:
-        user_input = input("You: ").strip()
-
-        if user_input.lower() in ["exit", "quit"]:
-            print("Goodbye!")
-            break
-
-        if not user_input:
-            continue
-
-        # Add user message
-        messages.append({"role": "user", "content": user_input})
-
-        # Chat loop with function calling
-        while True:
-            try:
-                # Make API call
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    tools=FUNCTIONS,
-                    tool_choice="auto",
-                )
-
-                assistant_message = response.choices[0].message
-                messages.append(assistant_message)
-
-                # Check if function call is needed
-                if assistant_message.tool_calls:
-                    # Execute function calls
-                    for tool_call in assistant_message.tool_calls:
-                        function_name = tool_call.function.name
-                        arguments = json.loads(tool_call.function.arguments)
-
-                        print(f"\n[Tool Call: {function_name}]")
-                        print(f"Arguments: {json.dumps(arguments, indent=2)}")
-
-                        # Execute the function
-                        function_result = execute_function(function_name, arguments)
-
-                        print(f"Result: {function_result}\n")
-
-                        # Add function result to messages
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "content": str(function_result),
-                            }
-                        )
-                else:
-                    # No function call, display response
-                    print(f"\nAssistant: {assistant_message.content}\n")
-                    break
-
-            except Exception as e:
-                print(f"\nError: {str(e)}\n")
-                break
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Healthcare Agent Chat - A conversational AI assistant for querying patient data."
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="gpt-5",
-        help="OpenAI model to use (default: gpt-5)",
-    )
-    args = parser.parse_args()
-
-    if not os.getenv("OPENAI_API_KEY"):
-        print("Error: OPENAI_API_KEY not found in environment variables.")
-        print("Please create a .env file with your OpenAI API key.")
-        print("Example: OPENAI_API_KEY=your_key_here")
-        exit(1)
-
-    chat_loop(model=args.model)
+def execute_tool(function_name: str, arguments_json: str) -> str:
+    """Execute a tool/function and return the result as JSON string."""
+    try:
+        arguments = json.loads(arguments_json)
+        result = execute_function(function_name, arguments)
+        return json.dumps({"success": True, "result": str(result)})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
