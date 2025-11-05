@@ -106,38 +106,7 @@ FUNCTIONS = [
                 "required": ["patient_id", "tables"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "compare_dates",
-            "description": "Compare two dates and return information about their relationship (which is earlier, if equal, difference in days).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date1": {
-                        "type": "string",
-                        "description": "First date in YYYY-MM-DD format",
-                    },
-                    "date2": {
-                        "type": "string",
-                        "description": "Second date in YYYY-MM-DD format",
-                    },
-                    "date_format": {
-                        "type": "string",
-                        "description": "Format of the input dates (default: %Y-%m-%d)",
-                        "default": "%Y-%m-%d",
-                    },
-                    "db_path": {
-                        "type": "string",
-                        "description": "Path to the SQLite database file (optional, defaults to ./synthea_data.db)",
-                        "default": "./synthea_data.db",
-                    },
-                },
-                "required": ["date1", "date2"],
-            },
-        },
-    },
+    }
 ]
 
 # Function mapping
