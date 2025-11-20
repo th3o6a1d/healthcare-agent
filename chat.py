@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from openai import OpenAI
 from dotenv import load_dotenv
 
-from tools.sqlite import query_db, get_db_schema, get_patient_data, compare_dates
+from tools.sqlite import query_db, get_db_schema
 
 # Load environment variables
 load_dotenv()
@@ -55,66 +55,12 @@ FUNCTIONS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_patient_data",
-            "description": "Retrieve data from specified tables for a patient, optionally filtered by date range. Available tables: demographics, medications, labs, lab_tests_only, imaging, procedures, conditions, problem_list, encounters, allergies, immunizations, careplans, devices.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "patient_id": {
-                        "type": "string",
-                        "description": "Unique patient identifier",
-                    },
-                    "tables": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "demographics",
-                                "medications",
-                                "labs",
-                                "lab_tests_only",
-                                "imaging",
-                                "procedures",
-                                "conditions",
-                                "problem_list",
-                                "encounters",
-                                "allergies",
-                                "immunizations",
-                                "careplans",
-                                "devices",
-                            ],
-                        },
-                        "description": "List of table names to retrieve data from",
-                    },
-                    "start_date": {
-                        "type": "string",
-                        "description": "Start date for filtering (YYYY-MM-DD format). Must be provided with end_date.",
-                    },
-                    "end_date": {
-                        "type": "string",
-                        "description": "End date for filtering (YYYY-MM-DD format). Must be provided with start_date.",
-                    },
-                    "db_path": {
-                        "type": "string",
-                        "description": "Path to the SQLite database file (optional, defaults to ./synthea_data.db)",
-                        "default": "./synthea_data.db",
-                    },
-                },
-                "required": ["patient_id", "tables"],
-            },
-        },
-    }
 ]
 
 # Function mapping
 FUNCTION_MAP = {
     "query_db": query_db,
     "get_db_schema": get_db_schema,
-    "get_patient_data": get_patient_data,
-    "compare_dates": compare_dates,
 }
 
 
