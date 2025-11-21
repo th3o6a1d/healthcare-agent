@@ -85,7 +85,20 @@ def chat_loop(model: str = "gpt-5"):
     messages: List[Dict[str, Any]] = [
         {
             "role": "system",
-            "content": "You are a helpful healthcare assistant that can query patient data and medical records from a SQLite database. You can help users understand patient information, analyze medical data, and answer questions about healthcare records. Do not make assumptions about what terms can be used to query the database; rely on the tools provided to you.",
+            "content": f"""
+            
+You are a helpful healthcare assistant that can query patient data and medical records from a SQLite database. 
+You can help users understand patient information, analyze medical data, and answer questions about healthcare records. 
+
+Your goal is to be comprehensive and accurate. 
+Do not assume that all relevant data is in the correct table. 
+You may also need to make inferences from the data to answer the question, such as inferring a diagnosis from a lab result or medication history.
+You may need to explore multiple tables and do broad searches to find the information you need.
+
+First, plan your approach to the question.
+Then, execute the plan and periodically update the user on your progress.
+
+""",
         }
     ]
 
@@ -109,23 +122,92 @@ def chat_loop(model: str = "gpt-5"):
         # Chat loop with function calling
         while True:
             try:
-                # Make API call
-                response = client.chat.completions.create(
+                # Make streaming API call
+                stream = client.chat.completions.create(
                     model=model,
                     messages=messages,
                     tools=FUNCTIONS,
                     tool_choice="auto",
+                    stream=True,
                 )
 
-                assistant_message = response.choices[0].message
-                messages.append(assistant_message)
+                # Collect the full response for message history
+                assistant_message = {"role": "assistant", "content": "", "tool_calls": []}
+                current_tool_call = None
+                print("\nAssistant: ", end="", flush=True)
+
+                for chunk in stream:
+                    delta = chunk.choices[0].delta
+                    
+                    # Handle content streaming
+                    if delta.content:
+                        print(delta.content, end="", flush=True)
+                        assistant_message["content"] += delta.content
+                    
+                    # Handle tool calls
+                    if delta.tool_calls:
+                        for tool_call_delta in delta.tool_calls:
+                            if tool_call_delta.index is not None:
+                                # Ensure we have enough tool calls in our list
+                                while len(assistant_message["tool_calls"]) <= tool_call_delta.index:
+                                    assistant_message["tool_calls"].append({
+                                        "id": "",
+                                        "type": "function",
+                                        "function": {"name": "", "arguments": ""}
+                                    })
+                                
+                                current_tool_call = assistant_message["tool_calls"][tool_call_delta.index]
+                                
+                                if tool_call_delta.id:
+                                    current_tool_call["id"] = tool_call_delta.id
+                                if tool_call_delta.function:
+                                    if tool_call_delta.function.name:
+                                        current_tool_call["function"]["name"] = tool_call_delta.function.name
+                                    if tool_call_delta.function.arguments:
+                                        current_tool_call["function"]["arguments"] += tool_call_delta.function.arguments
+
+                print()  # New line after streaming completes
+
+                # Convert to OpenAI message format
+                if assistant_message["tool_calls"]:
+                    # Convert tool_calls to the format expected by OpenAI
+                    tool_calls = []
+                    for tc in assistant_message["tool_calls"]:
+                        if tc["id"]:  # Only add if it has an ID (was actually called)
+                            tool_calls.append({
+                                "id": tc["id"],
+                                "type": tc["type"],
+                                "function": {
+                                    "name": tc["function"]["name"],
+                                    "arguments": tc["function"]["arguments"]
+                                }
+                            })
+                    
+                    if tool_calls:
+                        api_message = {
+                            "role": "assistant",
+                            "content": assistant_message["content"] or None,
+                            "tool_calls": tool_calls
+                        }
+                    else:
+                        api_message = {
+                            "role": "assistant",
+                            "content": assistant_message["content"]
+                        }
+                else:
+                    api_message = {
+                        "role": "assistant",
+                        "content": assistant_message["content"]
+                    }
+
+                messages.append(api_message)
 
                 # Check if function call is needed
-                if assistant_message.tool_calls:
+                if api_message.get("tool_calls"):
                     # Execute function calls
-                    for tool_call in assistant_message.tool_calls:
-                        function_name = tool_call.function.name
-                        arguments = json.loads(tool_call.function.arguments)
+                    for tool_call in api_message["tool_calls"]:
+                        function_name = tool_call["function"]["name"]
+                        arguments = json.loads(tool_call["function"]["arguments"])
 
                         print(f"\n[Tool Call: {function_name}]")
                         print(f"Arguments: {json.dumps(arguments, indent=2)}")
@@ -139,13 +221,13 @@ def chat_loop(model: str = "gpt-5"):
                         messages.append(
                             {
                                 "role": "tool",
-                                "tool_call_id": tool_call.id,
+                                "tool_call_id": tool_call["id"],
                                 "content": str(function_result),
                             }
                         )
                 else:
-                    # No function call, display response
-                    print(f"\nAssistant: {assistant_message.content}\n")
+                    # No function call, response already displayed via streaming
+                    print()
                     break
 
             except Exception as e:
@@ -160,8 +242,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-5",
-        help="OpenAI model to use (default: gpt-5)",
+        default="gpt-5.1",
+        help="OpenAI model to use (default: gpt-5.1)",
     )
     args = parser.parse_args()
 
